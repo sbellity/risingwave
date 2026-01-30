@@ -610,11 +610,20 @@ impl Cluster {
     /// Start a SQL session on the client node.
     #[cfg_or_panic(madsim)]
     pub fn start_session(&mut self) -> Session {
+        self.start_session_in_db("dev")
+    }
+
+    /// Start a SQL session on the client node, connecting to the given database.
+    ///
+    /// This is useful for multi-database simulation tests (e.g., tiered freshness databases).
+    #[cfg_or_panic(madsim)]
+    pub fn start_session_in_db(&mut self, dbname: impl Into<String>) -> Session {
+        let dbname = dbname.into();
         let (query_tx, mut query_rx) = mpsc::channel::<SessionRequest>(0);
         let per_session_queries = self.per_session_queries();
 
         self.client.spawn(async move {
-            let mut client = RisingWave::connect("frontend".into(), "dev".into()).await?;
+            let mut client = RisingWave::connect("frontend".into(), dbname).await?;
 
             for sql in per_session_queries.as_ref() {
                 client.run(sql).await?;

@@ -116,6 +116,15 @@ impl CompleteBarrierTask {
             let wait_commit_timer = GLOBAL_META_METRICS
                 .barrier_wait_commit_latency
                 .start_timer();
+
+            // Track commit payload scale. These should stay small for sparse workloads.
+            GLOBAL_META_METRICS
+                .commit_epoch_tables_to_commit_count
+                .observe(self.commit_info.tables_to_commit.len() as f64);
+            GLOBAL_META_METRICS
+                .commit_epoch_sstable_count
+                .observe(self.commit_info.sstables.len() as f64);
+
             let version_stats = context.commit_epoch(self.commit_info).await?;
 
             // Handle list finished source IDs for refreshable batch sources
