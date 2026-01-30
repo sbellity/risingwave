@@ -918,7 +918,47 @@ impl CommandContext {
         );
 
         let epoch = self.barrier_info.prev_epoch();
-        for table_id in &self.table_ids_to_commit {
+
+        // Experimental: commit only tables that actually changed ("dirty tables") to reduce
+        // commit overhead for workloads with massive numbers of mostly-cold MVs.
+        //
+        // Enabled by env var RW_ENABLE_SPARSE_TABLES_TO_COMMIT=1.
+        let enable_sparse = std::env::var("RW_ENABLE_SPARSE_TABLES_TO_COMMIT")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        let mut tables_to_commit: HashSet<TableId> = if enable_sparse {
+            let mut dirty = HashSet::<TableId>::new();
+
+            // Tables present in newly synced SSTs.
+            for sst in &synced_ssts {
+                dirty.extend(sst.table_stats.keys().copied());
+            }
+
+            // Tables with change-log deltas / watermarks / vector index deltas.
+            dirty.extend(table_new_change_log.keys().copied());
+            dirty.extend(new_table_watermarks.keys().copied());
+            dirty.extend(vector_index_adds.keys().copied());
+
+            // Truncation is also a logical mutation that should advance table epochs.
+            dirty.extend(truncate_tables.iter().copied());
+
+            // If we're creating a new job, ensure its tables are committed.
+            for NewTableFragmentInfo { table_ids } in &new_table_fragment_infos {
+                dirty.extend(table_ids.iter().copied());
+            }
+
+            // Safety fallback: keep legacy behavior if nothing is dirty.
+            if dirty.is_empty() {
+                self.table_ids_to_commit.clone()
+            } else {
+                dirty
+            }
+        } else {
+            self.table_ids_to_commit.clone()
+        };
+
+        for table_id in &tables_to_commit {
             info.tables_to_commit
                 .try_insert(*table_id, epoch)
                 .expect("non duplicate");
