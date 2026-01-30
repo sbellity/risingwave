@@ -18,6 +18,7 @@ mod auto_parallelism;
 mod backfill_parallelism;
 mod background_ddl;
 mod cascade_materialized_view;
+mod cdp_segment_tiers;
 mod dynamic_filter;
 mod isolation;
 mod nexmark_chaos;

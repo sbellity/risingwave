@@ -99,6 +99,11 @@ pub struct MetaMetrics {
     /// The barrier interval of each database
     pub barrier_interval_by_database: GaugeVec,
 
+    /// Number of tables included in each commit_epoch call (size of CommitEpochInfo.tables_to_commit)
+    pub commit_epoch_tables_to_commit_count: Histogram,
+    /// Number of SSTs included in each commit_epoch call
+    pub commit_epoch_sstable_count: Histogram,
+
     // ********************************** Snapshot Backfill ***************************
     /// The barrier latency in second of `table_id` and snapshto backfill `barrier_type`
     pub snapshot_backfill_barrier_latency: LabelGuardedHistogramVec, // (table_id, barrier_type)
@@ -297,6 +302,21 @@ impl MetaMetrics {
             registry
         )
         .unwrap();
+
+        let opts = histogram_opts!(
+            "meta_hummock_commit_epoch_tables_to_commit_count",
+            "number of tables in CommitEpochInfo.tables_to_commit per commit_epoch",
+            exponential_buckets(1.0, 2.0, 21).unwrap() // max ~1,048,576
+        );
+        let commit_epoch_tables_to_commit_count =
+            register_histogram_with_registry!(opts, registry).unwrap();
+
+        let opts = histogram_opts!(
+            "meta_hummock_commit_epoch_sstable_count",
+            "number of SSTs in CommitEpochInfo.sstables per commit_epoch",
+            exponential_buckets(1.0, 2.0, 21).unwrap()
+        );
+        let commit_epoch_sstable_count = register_histogram_with_registry!(opts, registry).unwrap();
 
         let all_barrier_nums = register_guarded_int_gauge_vec_with_registry!(
             "all_barrier_nums",
@@ -947,6 +967,8 @@ impl MetaMetrics {
             in_flight_barrier_nums,
             last_committed_barrier_time,
             barrier_interval_by_database,
+            commit_epoch_tables_to_commit_count,
+            commit_epoch_sstable_count,
             snapshot_backfill_barrier_latency,
             snapshot_backfill_wait_commit_latency,
             snapshot_backfill_lag,

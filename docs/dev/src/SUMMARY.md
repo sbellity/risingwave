@@ -36,6 +36,7 @@
 
 - [Architecture Design](./design/architecture-design.md)
 - [Streaming Engine](./design/streaming-overview.md)
+    - [Cold-tier table sharding](./design/cold-tier-table-sharding.md)
     - [Checkpoint](./design/checkpoint.md)
     - [Aggregation](./design/aggregation.md)
     - [MView on Top of MView](./design/mv-on-mv.md)
