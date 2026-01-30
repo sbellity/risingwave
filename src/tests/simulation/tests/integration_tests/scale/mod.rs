@@ -29,6 +29,7 @@ mod parallelism_exceeds_cores;
 mod resource_group;
 mod schedulability;
 mod shared_source;
+mod sparse_commit_dirty_tables;
 mod singleton_migration;
 mod sink;
 mod streaming_parallelism;
