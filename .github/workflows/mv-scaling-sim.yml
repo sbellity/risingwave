@@ -18,6 +18,11 @@ jobs:
         with:
           toolchain: nightly-2025-10-10
 
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
