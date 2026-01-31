@@ -1,0 +1,61 @@
+# PR description:
+# This workflow adds CI coverage for the new MV-scaling simulation smoke tests:
+# - test_cdp_segment_tiers_smoke
+# - test_sparse_commit_dirty_tables_smoke (runs with RW_ENABLE_SPARSE_TABLES_TO_COMMIT=1)
+#
+# It runs on pull requests and pushes to `main`, and uses Rust build caching to speed up reruns.
+
+name: Simulation MV-scaling smoke
+
+on:
+  pull_request:
+  push:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mv-scaling-sim:
+    runs-on: risingwave-large
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - test_name: test_cdp_segment_tiers_smoke
+            sparse_tables_to_commit: "0"
+          - test_name: test_sparse_commit_dirty_tables_smoke
+            sparse_tables_to_commit: "1"
+
+    name: ${{ matrix.test_name }}
+
+    env:
+      RUST_BACKTRACE: "1"
+      CARGO_INCREMENTAL: "0"
+      # Reduce debug info size to help disk usage on CI.
+      CARGO_PROFILE_DEV_DEBUG: "false"
+      CARGO_PROFILE_TEST_DEBUG: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            make build-essential cmake protobuf-compiler curl openssl libssl-dev \
+            libsasl2-dev libcurl4-openssl-dev pkg-config postgresql-client tmux \
+            lld libblas-dev liblapack-dev libomp-dev
+
+      - name: Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: simulation-mv-scaling-smoke
+          cache-on-failure: true
+
+      - name: Run simulation smoke test
+        env:
+          RW_ENABLE_SPARSE_TABLES_TO_COMMIT: ${{ matrix.sparse_tables_to_commit }}
+        run: |
+          cargo test -p risingwave_simulation --test integration_tests \
+            ${{ matrix.test_name }} -- --nocapture
